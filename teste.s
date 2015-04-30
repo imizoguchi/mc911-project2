@@ -4,6 +4,7 @@ entry:
   %tmp0 = alloca i32
   store i32 0, i32 * %tmp0
   %tmp1 = icmp ult i32 10, 20
+  br label %whileBegin6
 whileBegin6:
   br i1 %tmp1, label %whileDo6, label %whileEnd6
 whileDo6:

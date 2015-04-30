@@ -5,6 +5,5 @@ class m318
    {
        while ( 10 < 20 )
           System.out.println(1);
-      
    }
 }

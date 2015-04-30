@@ -250,6 +250,7 @@ public class Codegen extends VisitorAdapter{
 		// Else
 		assembler.add(new LlvmLabel(elseLabel));
 		if(n.elseClause != null) n.elseClause.accept(this);
+		assembler.add(new LlvmBranch(endLabel));
 		
 		// End
 		assembler.add(new LlvmLabel(endLabel));
@@ -263,6 +264,7 @@ public class Codegen extends VisitorAdapter{
 		LlvmLabelValue beginLabel = new LlvmLabelValue("whileBegin" + line);
 		LlvmLabelValue doLabel = new LlvmLabelValue("whileDo" + line);
 		LlvmLabelValue endLabel = new LlvmLabelValue("whileEnd" + line);
+		assembler.add(new LlvmBranch(beginLabel));
 		
 		assembler.add(new LlvmLabel(beginLabel));
 		assembler.add(new LlvmBranch(cmp, doLabel, endLabel));
