@@ -41,6 +41,7 @@ import java.util.Map;
 
 import llvmast.LlvmAlloca;
 import llvmast.LlvmArray;
+import llvmast.LlvmBool;
 import llvmast.LlvmBranch;
 import llvmast.LlvmCall;
 import llvmast.LlvmCloseDefinition;
@@ -229,8 +230,15 @@ public class Codegen extends VisitorAdapter{
 	public LlvmValue visit(MethodDecl n){return null;}
 	public LlvmValue visit(Formal n){return null;}
 	public LlvmValue visit(IntArrayType n){return null;}
-	public LlvmValue visit(BooleanType n){return null;}
-	public LlvmValue visit(IntegerType n){return null;}
+	
+	public LlvmValue visit(BooleanType n) {
+		return new LlvmNamedValue("boolean", LlvmPrimitiveType.I1);
+	}
+	
+	public LlvmValue visit(IntegerType n) {
+		return new LlvmNamedValue("int", LlvmPrimitiveType.I32);
+	}
+	
 	public LlvmValue visit(IdentifierType n){return null;}
 	public LlvmValue visit(Block n){return null;}
 	
@@ -315,8 +323,15 @@ public class Codegen extends VisitorAdapter{
 	public LlvmValue visit(ArrayLookup n){return null;}
 	public LlvmValue visit(ArrayLength n){return null;}
 	public LlvmValue visit(Call n){return null;}
-	public LlvmValue visit(True n){return null;}
-	public LlvmValue visit(False n){return null;}
+	
+	public LlvmValue visit(True n) {
+		return new LlvmBool(LlvmBool.TRUE);
+	}
+	
+	public LlvmValue visit(False n) {
+		return new LlvmBool(LlvmBool.FALSE);
+	}
+	
 	public LlvmValue visit(IdentifierExp n){return null;}
 	public LlvmValue visit(This n){return null;}
 	public LlvmValue visit(NewArray n){return null;}
