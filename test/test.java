@@ -1,8 +1,10 @@
-// testando operador + (OK)
-class m309
+// testando operador < (OK)
+class m318
 {
    public static void main(String[] args)
    {
-       System.out.println(10 + 1);
+       while ( 10 < 20 )
+          System.out.println(1);
+      
    }
 }

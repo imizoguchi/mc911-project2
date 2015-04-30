@@ -41,6 +41,7 @@ import java.util.Map;
 
 import llvmast.LlvmAlloca;
 import llvmast.LlvmArray;
+import llvmast.LlvmBranch;
 import llvmast.LlvmCall;
 import llvmast.LlvmCloseDefinition;
 import llvmast.LlvmConstantDeclaration;
@@ -232,8 +233,48 @@ public class Codegen extends VisitorAdapter{
 	public LlvmValue visit(IntegerType n){return null;}
 	public LlvmValue visit(IdentifierType n){return null;}
 	public LlvmValue visit(Block n){return null;}
-	public LlvmValue visit(If n){return null;}
-	public LlvmValue visit(While n){return null;}
+	
+	public LlvmValue visit(If n) {
+		int line = n.line;
+		LlvmValue cmp = n.condition.accept(this);
+		LlvmLabelValue trueLabel = new LlvmLabelValue("iftrue" + line);
+		LlvmLabelValue elseLabel = new LlvmLabelValue("ifelse" + line);
+		LlvmLabelValue endLabel = new LlvmLabelValue("ifend" + line);
+		
+		// If
+		assembler.add(new LlvmBranch(cmp, trueLabel, elseLabel));
+		assembler.add(new LlvmLabel(trueLabel));
+		n.thenClause.accept(this);
+		assembler.add(new LlvmBranch(endLabel));
+		
+		// Else
+		assembler.add(new LlvmLabel(elseLabel));
+		if(n.elseClause != null) n.elseClause.accept(this);
+		
+		// End
+		assembler.add(new LlvmLabel(endLabel));
+		
+		return cmp;
+	}
+
+	public LlvmValue visit(While n){
+		int line = n.line;
+		LlvmValue cmp = n.condition.accept(this);
+		LlvmLabelValue beginLabel = new LlvmLabelValue("whileBegin" + line);
+		LlvmLabelValue doLabel = new LlvmLabelValue("whileDo" + line);
+		LlvmLabelValue endLabel = new LlvmLabelValue("whileEnd" + line);
+		
+		assembler.add(new LlvmLabel(beginLabel));
+		assembler.add(new LlvmBranch(cmp, doLabel, endLabel));
+		
+		assembler.add(new LlvmLabel(doLabel));
+		n.body.accept(this);
+		assembler.add(new LlvmBranch(beginLabel));
+		
+		assembler.add(new LlvmLabel(endLabel));
+		
+		return cmp;
+	}
 	public LlvmValue visit(Assign n){return null;}
 	public LlvmValue visit(ArrayAssign n){return null;}
 	public LlvmValue visit(And n){return null;}
