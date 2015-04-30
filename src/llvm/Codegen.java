@@ -47,6 +47,7 @@ import llvmast.LlvmConstantDeclaration;
 import llvmast.LlvmDefine;
 import llvmast.LlvmExternalDeclaration;
 import llvmast.LlvmGetElementPointer;
+import llvmast.LlvmIcmp;
 import llvmast.LlvmInstruction;
 import llvmast.LlvmIntegerLiteral;
 import llvmast.LlvmLabel;
@@ -61,6 +62,7 @@ import llvmast.LlvmRegister;
 import llvmast.LlvmRet;
 import llvmast.LlvmStore;
 import llvmast.LlvmStructure;
+import llvmast.LlvmTimes;
 import llvmast.LlvmType;
 import llvmast.LlvmValue;
 import semant.Env;
@@ -235,8 +237,22 @@ public class Codegen extends VisitorAdapter{
 	public LlvmValue visit(Assign n){return null;}
 	public LlvmValue visit(ArrayAssign n){return null;}
 	public LlvmValue visit(And n){return null;}
-	public LlvmValue visit(LessThan n){return null;}
-	public LlvmValue visit(Equal n){return null;}
+	
+	public LlvmValue visit(LessThan n){
+		LlvmValue v1 = n.lhs.accept(this);
+		LlvmValue v2 = n.rhs.accept(this);
+		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I32);
+		assembler.add(new LlvmIcmp(lhs,LlvmIcmp.ULT,LlvmPrimitiveType.I32,v1,v2)); // Conferir se entrada ser unsigned ou signed pode ser um problema
+		return lhs;
+	}
+	
+	public LlvmValue visit(Equal n){
+		LlvmValue v1 = n.lhs.accept(this);
+		LlvmValue v2 = n.rhs.accept(this);
+		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I32);
+		assembler.add(new LlvmIcmp(lhs,LlvmIcmp.EQ,LlvmPrimitiveType.I32,v1,v2)); // Conferir se entrada ser unsigned ou signed pode ser um problema
+		return lhs;
+	}
 	
 	public LlvmValue visit(Minus n){
 		LlvmValue v1 = n.lhs.accept(this);
@@ -246,7 +262,13 @@ public class Codegen extends VisitorAdapter{
 		return lhs;
 	}
 	
-	public LlvmValue visit(Times n){return null;}
+	public LlvmValue visit(Times n){
+		LlvmValue v1 = n.lhs.accept(this);
+		LlvmValue v2 = n.rhs.accept(this);
+		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I32);
+		assembler.add(new LlvmTimes(lhs,LlvmPrimitiveType.I32,v1,v2));
+		return lhs;
+	}
 	public LlvmValue visit(ArrayLookup n){return null;}
 	public LlvmValue visit(ArrayLength n){return null;}
 	public LlvmValue visit(Call n){return null;}
