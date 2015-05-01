@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 
 import llvmast.LlvmAlloca;
+import llvmast.LlvmAnd;
 import llvmast.LlvmArray;
 import llvmast.LlvmBool;
 import llvmast.LlvmBranch;
@@ -67,6 +68,7 @@ import llvmast.LlvmStructure;
 import llvmast.LlvmTimes;
 import llvmast.LlvmType;
 import llvmast.LlvmValue;
+import llvmast.LlvmXor;
 import semant.Env;
 import syntaxtree.And;
 import syntaxtree.ArrayAssign;
@@ -287,13 +289,20 @@ public class Codegen extends VisitorAdapter{
 	}
 	public LlvmValue visit(Assign n){return null;}
 	public LlvmValue visit(ArrayAssign n){return null;}
-	public LlvmValue visit(And n){return null;}
+	
+	public LlvmValue visit(And n) {
+		LlvmValue v1 = n.lhs.accept(this);
+		LlvmValue v2 = n.rhs.accept(this);
+		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I1);
+		assembler.add(new LlvmAnd(lhs,LlvmPrimitiveType.I1,v1,v2));
+		return lhs;
+	}
 	
 	public LlvmValue visit(LessThan n){
 		LlvmValue v1 = n.lhs.accept(this);
 		LlvmValue v2 = n.rhs.accept(this);
 		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I32);
-		assembler.add(new LlvmIcmp(lhs,LlvmIcmp.ULT,LlvmPrimitiveType.I32,v1,v2)); // Conferir se entrada ser unsigned ou signed pode ser um problema
+		assembler.add(new LlvmIcmp(lhs,LlvmIcmp.ULT,LlvmPrimitiveType.I32,v1,v2));
 		return lhs;
 	}
 	
@@ -301,7 +310,7 @@ public class Codegen extends VisitorAdapter{
 		LlvmValue v1 = n.lhs.accept(this);
 		LlvmValue v2 = n.rhs.accept(this);
 		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I32);
-		assembler.add(new LlvmIcmp(lhs,LlvmIcmp.EQ,LlvmPrimitiveType.I32,v1,v2)); // Conferir se entrada ser unsigned ou signed pode ser um problema
+		assembler.add(new LlvmIcmp(lhs,LlvmIcmp.EQ,LlvmPrimitiveType.I32,v1,v2));
 		return lhs;
 	}
 	
@@ -336,7 +345,14 @@ public class Codegen extends VisitorAdapter{
 	public LlvmValue visit(This n){return null;}
 	public LlvmValue visit(NewArray n){return null;}
 	public LlvmValue visit(NewObject n){return null;}
-	public LlvmValue visit(Not n){return null;}
+	
+	public LlvmValue visit(Not n) {
+		LlvmValue v = n.exp.accept(this);
+		LlvmBool b = new LlvmBool(LlvmBool.TRUE);
+		LlvmRegister lhs = new LlvmRegister(LlvmPrimitiveType.I1);
+		assembler.add(new LlvmXor(lhs,LlvmPrimitiveType.I1,v,b));
+		return lhs;
+	}
 	public LlvmValue visit(Identifier n){return null;}
 }
 

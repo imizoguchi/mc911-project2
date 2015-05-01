@@ -1,9 +1,9 @@
-// testando operador < (OK)
-class m318
+// testando operador && (OK)
+class m322
 {
    public static void main(String[] args)
    {
-       while ( 10 < 20 )
+       if ( !false )
           System.out.println(1);
    }
 }
