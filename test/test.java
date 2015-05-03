@@ -11,7 +11,9 @@ class c
 {
 	int p;
 	public int i(int a){
+		int p;
 		p = (10 + 5)* 7;
+		System.out.println(p);
 		return 0;
 	}
 }

@@ -13,9 +13,12 @@ define i32 @__i_c(%class.c * %this, i32 %a) {
 entry:
   %tmp4 = alloca i32
   store i32 0, i32 * %tmp4
+  %p = alloca i32
   %tmp5 = add i32 10, 5
   %tmp6 = mul i32 %tmp5, 7
   store i32 %tmp6, i32 * %p
+  %tmp8 = getelementptr [4 x i8] * @.formatting.string, i32 0, i32 0
+  %tmp9 = call i32 (i8 *, ...)* @printf(i8 * %tmp8, i32 * %p)
   ret i32 0
 }
 declare i32 @printf (i8 *, ...)

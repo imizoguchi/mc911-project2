@@ -125,19 +125,18 @@ public class Codegen extends VisitorAdapter {
 	private MethodNode methodEnv; // Aponta para a metodo atualmente em uso em
 									// symTab
 
-	private Env env;
-
 	public Codegen() {
 		assembler = new LinkedList<LlvmInstruction>();
+		symTab = new SymTab();
 	}
 
 	// Método de entrada do Codegen
 	public String translate(Program p, Env env) {
 		codeGenerator = new Codegen();
-		codeGenerator.env = env;
+
 		// Preenchendo a Tabela de Símbolos
 		// Quem quiser usar 'env', apenas comente essa linha
-		// codeGenerator.symTab.FillTabSymbol(p);
+		codeGenerator.symTab.FillTabSymbol(p);
 
 		// Formato da String para o System.out.printlnijava "%d\n"
 		codeGenerator.assembler.add(new LlvmConstantDeclaration(
@@ -244,15 +243,7 @@ public class Codegen extends VisitorAdapter {
 	// Todos os visit's que devem ser implementados
 	public LlvmValue visit(ClassDeclSimple n) {
 
-		// Var declarations
-		List<LlvmValue> vars = new ArrayList<LlvmValue>();
-		List<LlvmType> types = new ArrayList<LlvmType>();
-		for (util.List<VarDecl> varList = n.varList; varList != null; varList = varList.tail) {
-			LlvmValue var = varList.head.accept(this);
-			vars.add(var);
-			types.add(var.type);
-		}
-		classEnv = new ClassCustomNode(n.name.s, new LlvmStructure(types), vars);
+		classEnv = symTab.classes.get(n.name.s);
 		assembler.add(classEnv.getClassDeclaration());
 
 		// Method Declarations
@@ -281,24 +272,18 @@ public class Codegen extends VisitorAdapter {
 	public LlvmValue visit(MethodDecl n) {
 
 		LlvmType returnType = n.returnType.accept(this).type;
-		List<LlvmValue> args = new LinkedList<LlvmValue>();
-		args.add(classEnv.getClassValue());
 
-		for (util.List<Formal> formals = n.formals; formals != null; formals = formals.tail) {
-			LlvmValue formal = formals.head.accept(this);
-			args.add(formal);
-		}
-		
-		methodEnv = classEnv.getMethodNode(n.name.s);
+		methodEnv = classEnv.methods.get(n.name.s);
 
 		// define
-		assembler.add(new LlvmDefine("@__" + methodEnv.getName() + "_"
-				+ classEnv.getName(), returnType, args));
+		assembler.add(new LlvmDefine("@__" + methodEnv.name + "_"
+				+ classEnv.getName(), returnType, methodEnv.formalList));
+
 		// label
 		assembler.add(new LlvmLabel(new LlvmLabelValue("entry")));
 
 		// alloc formals
-		for (LlvmValue val : args) {
+		for (LlvmValue val : methodEnv.formalList) {
 			if (!(val.toString().equals("%this"))) {
 				LlvmRegister R1 = new LlvmRegister(new LlvmPointer(val.type));
 				assembler.add(new LlvmAlloca(R1, LlvmPrimitiveType.I32,
@@ -307,11 +292,9 @@ public class Codegen extends VisitorAdapter {
 			}
 		}
 
-		List<LlvmValue> vars = new LinkedList<LlvmValue>();
 		// alloc vars
 		for (util.List<VarDecl> locals = n.locals; locals != null; locals = locals.tail) {
 			LlvmValue local = locals.head.accept(this);
-			vars.add(local);
 		}
 
 		// accept expr
@@ -410,18 +393,18 @@ public class Codegen extends VisitorAdapter {
 		LlvmRegister R;
 
 		// Var is from superclass
-		if (methodEnv.hasLocalVariable(n.var.s)) {
+		if (!methodEnv.hasLocalVariable("%" + n.var.s)) {
 			R = new LlvmRegister(var.type);
-			new LlvmGetElementPointer(R, methodEnv.getSource(classEnv),
-					methodEnv.getOffsetTo(n.var.s));
-			// R = new LlvmRegister("%"+var.toString(),new LlvmPointer(new
-			// LlvmClassType(classEnv.getName())));
+			assembler.add(new LlvmGetElementPointer(R, classEnv
+					.getClassPointer(), classEnv.getOffsetTo("%" + n.var.s)));
+			R = new LlvmRegister(R.name, new LlvmPointer(R.type));
+		} else {
+			// Var is from class
+
+			// Var is local
+			R = new LlvmRegister("%" + var.toString(),
+					new LlvmPointer(var.type));
 		}
-
-		// Var is from class
-
-		// Var is local
-		R = new LlvmRegister("%" + var.toString(), new LlvmPointer(var.type));
 		assembler.add(new LlvmStore(val, R));
 
 		return R;
@@ -486,6 +469,8 @@ public class Codegen extends VisitorAdapter {
 
 	// TODO
 	public LlvmValue visit(Call n) {
+		List<LlvmValue> actuals = new LinkedList<LlvmValue>();
+		actuals.size();
 		return null;
 	}
 
@@ -499,7 +484,44 @@ public class Codegen extends VisitorAdapter {
 
 	// TODO
 	public LlvmValue visit(IdentifierExp n) {
-		return null;
+		LlvmRegister reg = new LlvmRegister(LlvmPrimitiveType.I32);
+
+		LlvmValue result = null;
+		if (methodEnv != null) {
+			if (methodEnv.hasLocalVariable("%" + n.name.s)) {
+				LlvmValue local = methodEnv.vars.get("%" + n.name.s);
+				return new LlvmNamedValue(local.toString(), new LlvmPointer(
+						local.type));
+			} else {
+				// Get address of the class variable
+				LlvmRegister classVar = new LlvmRegister(LlvmPrimitiveType.I32);
+				assembler.add(new LlvmGetElementPointer(classVar, classEnv
+						.getClassPointer(), classEnv
+						.getOffsetTo("%" + n.name.s)));
+
+				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(
+						classVar.name, new LlvmPointer(classVar.type))));
+			}
+		}
+		// if (classEnv != null) {
+		// int i = 0;
+		// for (LlvmValue c : classEnv.vars) {
+		// i++;
+		// //c.head.accept(this);
+		// if (c.toString().equals(n.name.s)) {
+		// List<LlvmValue> offsets = new LinkedList<LlvmValue>();
+		// offsets.add(new LlvmNamedValue("0", LlvmPrimitiveType.I32));
+		// offsets.add(new LlvmNamedValue("" + i, LlvmPrimitiveType.I32));
+		// LlvmRegister ptr = new LlvmRegister(LlvmPrimitiveType.I32);
+		// assembler.add(new LlvmGetElementPointer(ptr, classEnv.value,
+		// offsets));
+		// assembler.add(new LlvmLoad(reg, ptr));
+		// //return reg;
+		// //new LlvmNamedValue(n.name.s, c.head.type);
+		// }
+		// }
+		// }
+		return reg;
 	}
 
 	public LlvmValue visit(This n) {
@@ -557,80 +579,137 @@ class SymTab extends VisitorAdapter {
 
 	public LlvmValue visit(MainClass n) {
 		classes = new HashMap<String, ClassNode>();
-		classes.put(n.className.s, new ClassCustomNode(n.className.s, null,
-				null));
+		classes.put(n.className.s, new ClassNode(n.className.s, null, null));
 		return null;
 	}
 
 	public LlvmValue visit(ClassDeclSimple n) {
-		List<LlvmType> typeList = null;
+
 		// Constroi TypeList com os tipos das variáveis da Classe (vai formar a
 		// Struct da classe)
-
-		List<LlvmValue> varList = null;
 		// Constroi VarList com as Variáveis da Classe
+		List<LlvmValue> vars = new ArrayList<LlvmValue>();
+		List<LlvmType> types = new ArrayList<LlvmType>();
+		for (util.List<VarDecl> varList = n.varList; varList != null; varList = varList.tail) {
+			LlvmValue var = varList.head.accept(this);
+			vars.add(var);
+			types.add(var.type);
+		}
+		classEnv = new ClassNode(n.name.s, new LlvmStructure(types), vars);
 
-		classes.put(n.name.s, new ClassCustomNode(n.name.s, new LlvmStructure(
-				typeList), varList));
+		classes.put(n.name.s, classEnv);
+
 		// Percorre n.methodList visitando cada método
+		// Method Declarations
+		for (util.List<MethodDecl> methodList = n.methodList; methodList != null; methodList = methodList.tail) {
+			methodList.head.accept(this);
+		}
 		return null;
 	}
 
+	// public LlvmValue visit(ClassDeclExtends n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(VarDecl n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(Formal n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(MethodDecl n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(IdentifierType n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(IntArrayType n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(BooleanType n) {
+	// return null;
+	// }
+	//
+	// public LlvmValue visit(IntegerType n) {
+	// return null;
+	// }
+
+	// TODO
 	public LlvmValue visit(ClassDeclExtends n) {
 		return null;
 	}
 
 	public LlvmValue visit(VarDecl n) {
+		LlvmValue value = n.type.accept(this);
+		LlvmNamedValue v = new LlvmNamedValue("%" + n.name.s, value.type);
+		// Alloca se pertence a uma declaracao de metodo
+		return v;
+	}
+
+	public LlvmValue visit(MethodDecl n) {
+
+		LlvmType returnType = n.returnType.accept(this).type;
+		List<LlvmValue> args = new LinkedList<LlvmValue>();
+		args.add(classEnv.getClassPointer());
+
+		for (util.List<Formal> formals = n.formals; formals != null; formals = formals.tail) {
+			LlvmValue formal = formals.head.accept(this);
+			args.add(formal);
+		}
+
+		List<LlvmValue> vars = new LinkedList<LlvmValue>();
+		for (util.List<VarDecl> locals = n.locals; locals != null; locals = locals.tail) {
+			LlvmValue local = locals.head.accept(this);
+			vars.add(local);
+		}
+
+		classEnv.addMethod(new MethodNode(n.name.s, args, vars));
+
 		return null;
 	}
 
 	public LlvmValue visit(Formal n) {
-		return null;
-	}
-
-	public LlvmValue visit(MethodDecl n) {
-		return null;
-	}
-
-	public LlvmValue visit(IdentifierType n) {
-		return null;
+		return new LlvmNamedValue("%" + n.name.s, n.type.accept(this).type);
 	}
 
 	public LlvmValue visit(IntArrayType n) {
-		return null;
+		return new LlvmNamedValue("int[]", new LlvmPointer(
+				LlvmPrimitiveType.I32));
 	}
 
 	public LlvmValue visit(BooleanType n) {
-		return null;
+		return new LlvmNamedValue("boolean", LlvmPrimitiveType.I1);
 	}
 
 	public LlvmValue visit(IntegerType n) {
+		return new LlvmNamedValue("int", LlvmPrimitiveType.I32);
+	}
+
+	// TODO
+	public LlvmValue visit(IdentifierType n) {
 		return null;
 	}
 }
 
-interface ClassNode {
-	String getName();
-
-	public MethodNode getMethodNode(String methodName);
-
-	public LlvmNamedValue getClassValue();
-	
-	public LlvmClassType getClassType();
-
-	public LlvmStructure getStructure();
-
-	public LlvmInstruction getClassDeclaration();
-}
-
-class ClassCustomNode extends LlvmType implements ClassNode {
+class ClassNode extends LlvmType {
 	private String name;
 	private LlvmStructure structure;
+	public List<LlvmValue> varList;
+	public List<MethodNode> methodList;
+	public Map<String, MethodNode> methods;
 
-	public ClassCustomNode(String nameClass, LlvmStructure structure,
+	public ClassNode(String nameClass, LlvmStructure structure,
 			List<LlvmValue> varList) {
 		this.name = nameClass;
 		this.structure = structure;
+		this.varList = varList;
+		this.methodList = new LinkedList<MethodNode>();
+		this.methods = new HashMap<String, MethodNode>();
 	}
 
 	public String getName() {
@@ -640,23 +719,16 @@ class ClassCustomNode extends LlvmType implements ClassNode {
 	public LlvmClassType getClassType() {
 		return new LlvmClassType(this.name);
 	}
-	
-	public LlvmNamedValue getClassValue() {
-		return new LlvmNamedValue("%this", getClassType());
+
+	public LlvmNamedValue getClassPointer() {
+		return new LlvmNamedValue("%this", new LlvmPointer(getClassType()));
 	}
 
-	@Override
-	public MethodNode getMethodNode(String methodName) {
-		return null;
-	}
-
-	@Override
 	public LlvmStructure getStructure() {
 		// TODO Auto-generated method stub
 		return structure;
 	}
 
-	@Override
 	public LlvmInstruction getClassDeclaration() {
 		// TODO Auto-generated method stub
 		return new LlvmInstruction() {
@@ -665,137 +737,46 @@ class ClassCustomNode extends LlvmType implements ClassNode {
 			}
 		};
 	}
-}
 
-class ClassEnvNode extends LlvmType implements ClassNode {
-	private ClassInfo info;
-
-	public ClassEnvNode(ClassInfo info) {
-		this.info = info;
+	public void addMethod(MethodNode methodNode) {
+		methodList.add(methodNode);
+		methods.put(methodNode.name, methodNode);
 	}
 
-	public String getName() {
-		return info.name.toString();
-	}
-
-	public MethodNode getMethodNode(String methodName) {
-		return new MethodEnvNode(info.methods.get(Symbol.symbol(methodName)));
-	}
-
-	@Override
-	public LlvmClassType getClassType() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public LlvmStructure getStructure() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public LlvmInstruction getClassDeclaration() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public LlvmNamedValue getClassValue() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-}
-
-interface MethodNode {
-	public String getName();
-
-	public String getStructure();
-
-	public Boolean hasLocalVariable(String name);
-
-	public LlvmValue getSource(ClassNode classEnv);
-
-	public List<LlvmValue> getOffsetTo(String name);
-}
-
-class MethodCustomNode extends LlvmType implements MethodNode {
-	public MethodCustomNode(String nameMethod, List<LlvmValue> formalList,
-			List<LlvmValue> varList) {
-	}
-
-	@Override
-	public String getName() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public String getStructure() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Boolean hasLocalVariable(String name) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public LlvmValue getSource(ClassNode classEnv) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public List<LlvmValue> getOffsetTo(String name) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-}
-
-class MethodEnvNode extends LlvmType implements MethodNode {
-
-	private MethodInfo info;
-
-	MethodEnvNode(MethodInfo info) {
-		this.info = info;
-	}
-
-	public String getName() {
-		return info.name.toString();
-	}
-
-	public Boolean hasLocalVariable(String name) {
-		if (info.formalsTable.get(Symbol.symbol(name)) == null
-				&& info.localsTable.get(Symbol.symbol(name)) == null) {
-			return false;
-		}
-
-		return true;
-	}
-
-	@Override
-	public LlvmValue getSource(ClassNode classEnv) {
-		// TODO Auto-generated method stub
-		return new LlvmNamedValue("%this", new LlvmPointer(new LlvmClassType(
-				classEnv.getName())));
-	}
-
-	@Override
-	public List<LlvmValue> getOffsetTo(String name) {
+	public List<LlvmValue> getOffsetTo(String varName) {
 		List<LlvmValue> offsets = new LinkedList<LlvmValue>();
-		for (util.List<VarInfo> locals = info.locals; locals != null; locals = locals.tail) {
-			VarInfo local = locals.head;
-
+		for (LlvmValue val : this.varList) {
+			if (val.toString().equals(varName))
+				break;
+			offsets.add(val);
 		}
-		return null;
+
+		if (offsets.size() == 0) {
+			offsets.add(new LlvmIntegerLiteral(0));
+			offsets.add(new LlvmIntegerLiteral(0));
+		}
+		return offsets;
+	}
+}
+
+class MethodNode extends LlvmType {
+	String name;
+	List<LlvmValue> formalList;
+	List<LlvmValue> varList;
+	Map<String, LlvmValue> vars;
+
+	public MethodNode(String name, List<LlvmValue> formalList,
+			List<LlvmValue> varList) {
+		this.name = name;
+		this.formalList = formalList;
+		this.varList = varList;
+		this.vars = new HashMap<String, LlvmValue>();
+		for (LlvmValue var : varList) {
+			this.vars.put(var.toString(), var);
+		}
 	}
 
-	@Override
-	public String getStructure() {
-		// TODO Auto-generated method stub
-		return null;
+	public Boolean hasLocalVariable(String varName) {
+		return this.vars.containsKey(varName);
 	}
 }
