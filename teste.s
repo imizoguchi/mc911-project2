@@ -28,16 +28,43 @@ entry:
   store i32 20, i32 * %tmp11
   store i32 300, i32 * %q
   store i32 4000, i32 * %r
-  %tmp13 = getelementptr %class.c * %this, i32 0, i32 0
-  %tmp12 = load i32 * %tmp13
-  %tmp14 = load i32 * %q
-  %tmp15 = add i32 %tmp12, %tmp14
-  %tmp16 = load i32 * %r
-  %tmp17 = add i32 %tmp15, %tmp16
-  %tmp18 = load i32 * %a_tmp
-  %tmp19 = add i32 %tmp17, %tmp18
-  %tmp20 = add i32 %tmp19, null
-  ret i32 %tmp20
+  %tmp12 = load i32 * * %b
+  %tmp13 = getelementptr i32 * %tmp12, i32 0
+  store i32 50000, i32 * %tmp13
+  %tmp14 = load i32 * * %b
+  %tmp15 = getelementptr i32 * %tmp14, i32 1
+  store i32 600000, i32 * %tmp15
+  %tmp16 = load i32 * * %b
+  %tmp17 = getelementptr i32 * %tmp16, i32 2
+  store i32 7000000, i32 * %tmp17
+  %tmp18 = load i32 * * %b
+  %tmp19 = getelementptr i32 * %tmp18, i32 3
+  store i32 80000000, i32 * %tmp19
+  %tmp21 = getelementptr %class.c * %this, i32 0, i32 0
+  %tmp20 = load i32 * %tmp21
+  %tmp22 = load i32 * %q
+  %tmp23 = add i32 %tmp20, %tmp22
+  %tmp24 = load i32 * %r
+  %tmp25 = add i32 %tmp23, %tmp24
+  %tmp26 = load i32 * %a_tmp
+  %tmp27 = add i32 %tmp25, %tmp26
+  %tmp28 = load i32 * * %b
+  %tmp29 = getelementptr i32 * %tmp28, i32 0
+  %tmp30 = load i32 * %tmp29
+  %tmp31 = add i32 %tmp27, %tmp30
+  %tmp32 = load i32 * * %b
+  %tmp33 = getelementptr i32 * %tmp32, i32 1
+  %tmp34 = load i32 * %tmp33
+  %tmp35 = add i32 %tmp31, %tmp34
+  %tmp36 = load i32 * * %b
+  %tmp37 = getelementptr i32 * %tmp36, i32 2
+  %tmp38 = load i32 * %tmp37
+  %tmp39 = add i32 %tmp35, %tmp38
+  %tmp40 = load i32 * * %b
+  %tmp41 = getelementptr i32 * %tmp40, i32 3
+  %tmp42 = load i32 * %tmp41
+  %tmp43 = add i32 %tmp39, %tmp42
+  ret i32 %tmp43
 }
 declare i32 @printf (i8 *, ...)
 declare i8 * @malloc (i32)

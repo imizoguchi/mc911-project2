@@ -44,6 +44,7 @@ import java.util.Map;
 import llvmast.LlvmAlloca;
 import llvmast.LlvmAnd;
 import llvmast.LlvmArray;
+import llvmast.LlvmBitcast;
 import llvmast.LlvmBool;
 import llvmast.LlvmBranch;
 import llvmast.LlvmCall;
@@ -416,6 +417,18 @@ public class Codegen extends VisitorAdapter {
 
 	// TODO
 	public LlvmValue visit(ArrayAssign n) {
+		LlvmValue var = n.var.accept(this);
+		LlvmValue index = n.index.accept(this);
+		LlvmValue value = n.value.accept(this);
+		
+		LlvmValue variableAddress = methodEnv.vars.get("%"+var.toString());
+		LlvmRegister variable = new LlvmRegister(new LlvmPointer(LlvmPrimitiveType.I32));
+		assembler.add(new LlvmLoad(variable, new LlvmNamedValue(variableAddress.toString(), new LlvmPointer(variableAddress.type))));
+		LlvmRegister lhs = new LlvmRegister(new LlvmPointer(LlvmPrimitiveType.I32));
+		List<LlvmValue> offsets = new LinkedList<LlvmValue>();
+		offsets.add(index);
+		assembler.add(new LlvmGetElementPointer(lhs,variable,offsets));
+		assembler.add(new LlvmStore(value, lhs)); 
 		return null;
 	}
 
@@ -463,7 +476,17 @@ public class Codegen extends VisitorAdapter {
 
 	// TODO
 	public LlvmValue visit(ArrayLookup n) {
-		return null;
+		LlvmValue array = n.array.accept(this);
+	   	LlvmValue index = n.index.accept(this);
+
+		LlvmRegister lhs = new LlvmRegister(new LlvmPointer(LlvmPrimitiveType.I32));
+		List<LlvmValue> offsets = new LinkedList<LlvmValue>();
+		offsets.add(index); // Calcula offset
+		
+		assembler.add(new LlvmGetElementPointer(lhs,array,offsets));
+		LlvmRegister value = new LlvmRegister(LlvmPrimitiveType.I32);
+		assembler.add(new LlvmLoad(value, lhs));
+		return value;
 	}
 
 	// TODO
@@ -513,10 +536,9 @@ public class Codegen extends VisitorAdapter {
 
 	// TODO
 	public LlvmValue visit(IdentifierExp n) {
-		LlvmRegister reg = new LlvmRegister(LlvmPrimitiveType.I32);
+		LlvmRegister reg = new LlvmRegister(n.type.accept(this).type);
 
-		LlvmValue result = null;
-		if (methodEnv != null) {
+		if (methodEnv != null) { // Implies classEnv != null
 			if (methodEnv.hasLocalVariable("%" + n.name.s)) {
 				LlvmValue local = methodEnv.vars.get("%" + n.name.s);
 				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(local
@@ -527,7 +549,7 @@ public class Codegen extends VisitorAdapter {
 				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(local
 						.toString()+"_tmp", new LlvmPointer(local.type))));
 				return reg;
-			}else {
+			} else {
 				// Get address of the class variable
 				LlvmRegister classVar = new LlvmRegister(LlvmPrimitiveType.I32);
 				assembler.add(new LlvmGetElementPointer(classVar, classEnv
@@ -538,24 +560,8 @@ public class Codegen extends VisitorAdapter {
 						classVar.name, new LlvmPointer(classVar.type))));
 			}
 		}
-		// if (classEnv != null) {
-		// int i = 0;
-		// for (LlvmValue c : classEnv.vars) {
-		// i++;
-		// //c.head.accept(this);
-		// if (c.toString().equals(n.name.s)) {
-		// List<LlvmValue> offsets = new LinkedList<LlvmValue>();
-		// offsets.add(new LlvmNamedValue("0", LlvmPrimitiveType.I32));
-		// offsets.add(new LlvmNamedValue("" + i, LlvmPrimitiveType.I32));
-		// LlvmRegister ptr = new LlvmRegister(LlvmPrimitiveType.I32);
-		// assembler.add(new LlvmGetElementPointer(ptr, classEnv.value,
-		// offsets));
-		// assembler.add(new LlvmLoad(reg, ptr));
-		// //return reg;
-		// //new LlvmNamedValue(n.name.s, c.head.type);
-		// }
-		// }
-		// }
+		
+		// TODO globals
 		return reg;
 	}
 
@@ -570,7 +576,6 @@ public class Codegen extends VisitorAdapter {
 	 */
 	public LlvmValue visit(NewArray n) {
 		LlvmValue size = n.size.accept(this);
-		int sizeValue;
 		LlvmValue valueType = n.type.accept(this);
 		LlvmRegister R = new LlvmRegister(valueType.type);
 		assembler.add(new LlvmMalloc(R, LlvmPrimitiveType.I32, size));
@@ -578,11 +583,7 @@ public class Codegen extends VisitorAdapter {
 		return R;
 	}
 
-	// TODO
 	public LlvmValue visit(NewObject n) {
-		LlvmValue valType = n.type.accept(this);
-		LlvmValue x = n.className.accept(this);
-		LlvmStructure structure;
 
 		ClassNode classSymbol = symTab.classes.get(n.className.s);
 

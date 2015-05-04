@@ -20,7 +20,10 @@ class c
 		q = 300;
 		r = 4000;
 		b[0] = 50000;
+		b[1] = 600000;
+		b[2] = 7000000;
+		b[3] = 80000000;
 		// System.out.println(p);
-		return p+q+r+a+b[0];
+		return p+q+r+a+b[0]+b[1]+b[2]+b[3];
 	}
 }
