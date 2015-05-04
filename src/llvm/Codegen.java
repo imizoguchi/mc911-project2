@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
 import llvmast.LlvmAlloca;
 import llvmast.LlvmAnd;
 import llvmast.LlvmArray;
@@ -58,6 +59,7 @@ import llvmast.LlvmIntegerLiteral;
 import llvmast.LlvmLabel;
 import llvmast.LlvmLabelValue;
 import llvmast.LlvmLoad;
+import llvmast.LlvmMalloc;
 import llvmast.LlvmMinus;
 import llvmast.LlvmNamedValue;
 import llvmast.LlvmPlus;
@@ -88,6 +90,7 @@ import syntaxtree.ClassDecl;
 import syntaxtree.ClassDeclExtends;
 import syntaxtree.ClassDeclSimple;
 import syntaxtree.Equal;
+import syntaxtree.Exp;
 import syntaxtree.False;
 import syntaxtree.Formal;
 import syntaxtree.Identifier;
@@ -271,13 +274,10 @@ public class Codegen extends VisitorAdapter {
 
 	public LlvmValue visit(MethodDecl n) {
 
-		LlvmType returnType = n.returnType.accept(this).type;
-
 		methodEnv = classEnv.methods.get(n.name.s);
 
 		// define
-		assembler.add(new LlvmDefine("@__" + methodEnv.name + "_"
-				+ classEnv.getName(), returnType, methodEnv.formalList));
+		assembler.add(methodEnv.getFunctionDefinition(classEnv));
 
 		// label
 		assembler.add(new LlvmLabel(new LlvmLabelValue("entry")));
@@ -285,10 +285,10 @@ public class Codegen extends VisitorAdapter {
 		// alloc formals
 		for (LlvmValue val : methodEnv.formalList) {
 			if (!(val.toString().equals("%this"))) {
-				LlvmRegister R1 = new LlvmRegister(new LlvmPointer(val.type));
+				LlvmRegister R1 = new LlvmRegister(val.toString()+"_tmp", new LlvmPointer(val.type));
 				assembler.add(new LlvmAlloca(R1, LlvmPrimitiveType.I32,
 						new LinkedList<LlvmValue>()));
-				assembler.add(new LlvmStore(new LlvmIntegerLiteral(0), R1));
+				assembler.add(new LlvmStore(val, R1));
 			}
 		}
 
@@ -393,17 +393,21 @@ public class Codegen extends VisitorAdapter {
 		LlvmRegister R;
 
 		// Var is from superclass
-		if (!methodEnv.hasLocalVariable("%" + n.var.s)) {
+		if (!methodEnv.hasLocalVariable("%" + n.var.s) && !methodEnv.hasFormal("%" + n.var.s)) {
 			R = new LlvmRegister(var.type);
 			assembler.add(new LlvmGetElementPointer(R, classEnv
 					.getClassPointer(), classEnv.getOffsetTo("%" + n.var.s)));
 			R = new LlvmRegister(R.name, new LlvmPointer(R.type));
+			
 		} else {
 			// Var is from class
 
 			// Var is local
-			R = new LlvmRegister("%" + var.toString(),
-					new LlvmPointer(var.type));
+			String varName = "%" + n.var.s;
+			if(methodEnv.hasFormal(varName))
+				varName = varName + "_tmp";
+			R = new LlvmRegister(varName,
+					new LlvmPointer(val.type));
 		}
 		assembler.add(new LlvmStore(val, R));
 
@@ -469,9 +473,34 @@ public class Codegen extends VisitorAdapter {
 
 	// TODO
 	public LlvmValue visit(Call n) {
+		LlvmValue object = n.object.accept(this);
+		LlvmValue returnType = n.type.accept(this);
+		LlvmValue method = n.method.accept(this);
+		String functionName;
+
+		if (object != null && object.type instanceof LlvmPointer) {
+			LlvmPointer classPointer = (LlvmPointer) object.type;
+			LlvmClassType classType = (LlvmClassType) classPointer.content;
+			ClassNode classNode = symTab.classes.get(classType.name);
+			MethodNode methodNode = classNode.methods.get(method.toString());
+			functionName = methodNode.getFunctionName(classNode);
+		} else {
+			functionName = method.toString();
+		}
+
 		List<LlvmValue> actuals = new LinkedList<LlvmValue>();
-		actuals.size();
-		return null;
+
+		if (object != null && object.type instanceof LlvmPointer) {
+			actuals.add(object);
+		}
+
+		for (util.List<Exp> actualsList = n.actuals; actualsList != null; actualsList = actualsList.tail) {
+			actuals.add(actualsList.head.accept(this));
+		}
+		LlvmRegister lhs = new LlvmRegister(returnType.type);
+		assembler
+				.add(new LlvmCall(lhs, returnType.type, functionName, actuals));
+		return lhs;
 	}
 
 	public LlvmValue visit(True n) {
@@ -490,9 +519,15 @@ public class Codegen extends VisitorAdapter {
 		if (methodEnv != null) {
 			if (methodEnv.hasLocalVariable("%" + n.name.s)) {
 				LlvmValue local = methodEnv.vars.get("%" + n.name.s);
-				return new LlvmNamedValue(local.toString(), new LlvmPointer(
-						local.type));
-			} else {
+				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(local
+						.toString(), new LlvmPointer(local.type))));
+				return reg;
+			} else if (methodEnv.hasFormal("%" + n.name.s)) {
+				LlvmValue local = methodEnv.formals.get("%" + n.name.s);
+				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(local
+						.toString()+"_tmp", new LlvmPointer(local.type))));
+				return reg;
+			}else {
 				// Get address of the class variable
 				LlvmRegister classVar = new LlvmRegister(LlvmPrimitiveType.I32);
 				assembler.add(new LlvmGetElementPointer(classVar, classEnv
@@ -529,14 +564,33 @@ public class Codegen extends VisitorAdapter {
 				classEnv.getName())));
 	}
 
-	// TODO
+	/*
+	 * Needs to use malloc, once the array is on the heap (but pointer is on the
+	 * stack). Only for array of ints (minijava)
+	 */
 	public LlvmValue visit(NewArray n) {
-		return null;
+		LlvmValue size = n.size.accept(this);
+		int sizeValue;
+		LlvmValue valueType = n.type.accept(this);
+		LlvmRegister R = new LlvmRegister(valueType.type);
+		assembler.add(new LlvmMalloc(R, LlvmPrimitiveType.I32, size));
+
+		return R;
 	}
 
 	// TODO
 	public LlvmValue visit(NewObject n) {
-		return null;
+		LlvmValue valType = n.type.accept(this);
+		LlvmValue x = n.className.accept(this);
+		LlvmStructure structure;
+
+		ClassNode classSymbol = symTab.classes.get(n.className.s);
+
+		LlvmRegister lhs = new LlvmRegister(new LlvmPointer(
+				classSymbol.getClassType()));
+		assembler.add(new LlvmMalloc(lhs, classSymbol.getStructure(),
+				classSymbol.getClassType().toString()));
+		return lhs;
 	}
 
 	public LlvmValue visit(Not n) {
@@ -668,7 +722,7 @@ class SymTab extends VisitorAdapter {
 			vars.add(local);
 		}
 
-		classEnv.addMethod(new MethodNode(n.name.s, args, vars));
+		classEnv.addMethod(new MethodNode(n.name.s, args, vars, returnType));
 
 		return null;
 	}
@@ -763,10 +817,12 @@ class MethodNode extends LlvmType {
 	String name;
 	List<LlvmValue> formalList;
 	List<LlvmValue> varList;
+	Map<String, LlvmValue> formals;
 	Map<String, LlvmValue> vars;
+	LlvmType returnType;
 
 	public MethodNode(String name, List<LlvmValue> formalList,
-			List<LlvmValue> varList) {
+			List<LlvmValue> varList, LlvmType returnType) {
 		this.name = name;
 		this.formalList = formalList;
 		this.varList = varList;
@@ -774,6 +830,25 @@ class MethodNode extends LlvmType {
 		for (LlvmValue var : varList) {
 			this.vars.put(var.toString(), var);
 		}
+
+		this.formals = new HashMap<String, LlvmValue>();
+		for (LlvmValue formal : formalList) {
+			this.formals.put(formal.toString(), formal);
+		}
+
+		this.returnType = returnType;
+	}
+
+	public boolean hasFormal(String formalName) {
+		return this.formals.containsKey(formalName);
+	}
+
+	public LlvmInstruction getFunctionDefinition(ClassNode classEnv) {
+		return new LlvmDefine(getFunctionName(classEnv), returnType, formalList);
+	}
+
+	public String getFunctionName(ClassNode classEnv) {
+		return "@__" + this.name + "_" + classEnv.getName();
 	}
 
 	public Boolean hasLocalVariable(String varName) {

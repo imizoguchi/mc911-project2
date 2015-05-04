@@ -21,6 +21,10 @@ all: $(CLASSES)
 
 run:
 	java -classpath src:lib/projeto2.jar main/Main $(INPUT) $(OUTPUT)
+	
+run-lli:
+	java -classpath src:lib/projeto2.jar main/Main $(INPUT) $(OUTPUT)
+	/usr/local/opt/llvm/bin/lli $(OUTPUT)
 
 clean:
 	rm -f src/llvm/*.class src/llvmast/*.class

@@ -1,6 +1,6 @@
 package llvmast;
 public class LlvmClassType extends LlvmType {
-	String name;
+	public String name;
 	
 	public LlvmClassType(String name) {
 		this.name = name;
