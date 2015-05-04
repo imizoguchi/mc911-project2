@@ -20,51 +20,52 @@ entry:
   %q = alloca i32
   %r = alloca i32
   %b = alloca i32 *
-  %tmp9 = mul i32 4, 4
-  %tmp10 = call i8* @malloc ( i32 %tmp9)
-  %tmp8 = bitcast i8* %tmp10 to i32*
-  store i32 * %tmp8, i32 * * %b
-  %tmp11 = getelementptr %class.c * %this, i32 0, i32 0
-  store i32 20, i32 * %tmp11
+  %tmp8 = alloca [4 x i32]
+  %tmp9 = bitcast [4 x i32] * %tmp8 to i32 *
+  store i32 * %tmp9, i32 * * %b
+  %tmp10 = getelementptr %class.c * %this, i32 0, i32 0
+  store i32 20, i32 * %tmp10
   store i32 300, i32 * %q
   store i32 4000, i32 * %r
-  %tmp12 = load i32 * * %b
-  %tmp13 = getelementptr i32 * %tmp12, i32 0
-  store i32 50000, i32 * %tmp13
-  %tmp14 = load i32 * * %b
-  %tmp15 = getelementptr i32 * %tmp14, i32 1
-  store i32 600000, i32 * %tmp15
-  %tmp16 = load i32 * * %b
-  %tmp17 = getelementptr i32 * %tmp16, i32 2
-  store i32 7000000, i32 * %tmp17
-  %tmp18 = load i32 * * %b
-  %tmp19 = getelementptr i32 * %tmp18, i32 3
-  store i32 80000000, i32 * %tmp19
-  %tmp21 = getelementptr %class.c * %this, i32 0, i32 0
-  %tmp20 = load i32 * %tmp21
-  %tmp22 = load i32 * %q
-  %tmp23 = add i32 %tmp20, %tmp22
-  %tmp24 = load i32 * %r
-  %tmp25 = add i32 %tmp23, %tmp24
-  %tmp26 = load i32 * %a_tmp
-  %tmp27 = add i32 %tmp25, %tmp26
-  %tmp28 = load i32 * * %b
-  %tmp29 = getelementptr i32 * %tmp28, i32 0
-  %tmp30 = load i32 * %tmp29
-  %tmp31 = add i32 %tmp27, %tmp30
-  %tmp32 = load i32 * * %b
-  %tmp33 = getelementptr i32 * %tmp32, i32 1
-  %tmp34 = load i32 * %tmp33
-  %tmp35 = add i32 %tmp31, %tmp34
-  %tmp36 = load i32 * * %b
-  %tmp37 = getelementptr i32 * %tmp36, i32 2
-  %tmp38 = load i32 * %tmp37
-  %tmp39 = add i32 %tmp35, %tmp38
-  %tmp40 = load i32 * * %b
-  %tmp41 = getelementptr i32 * %tmp40, i32 3
-  %tmp42 = load i32 * %tmp41
-  %tmp43 = add i32 %tmp39, %tmp42
-  ret i32 %tmp43
+  %tmp11 = load i32 * * %b
+  %tmp12 = getelementptr i32 * %tmp11, i32 0
+  store i32 50000, i32 * %tmp12
+  %tmp13 = load i32 * * %b
+  %tmp14 = getelementptr i32 * %tmp13, i32 1
+  store i32 600000, i32 * %tmp14
+  %tmp15 = load i32 * * %b
+  %tmp16 = getelementptr i32 * %tmp15, i32 2
+  store i32 7000000, i32 * %tmp16
+  %tmp17 = load i32 * * %b
+  %tmp18 = getelementptr i32 * %tmp17, i32 3
+  store i32 80000000, i32 * %tmp18
+  %tmp19 = getelementptr [4 x i8] * @.formatting.string, i32 0, i32 0
+  %tmp20 = call i32 (i8 *, ...)* @printf(i8 * %tmp19, i32 4)
+  %tmp22 = getelementptr %class.c * %this, i32 0, i32 0
+  %tmp21 = load i32 * %tmp22
+  %tmp23 = load i32 * %q
+  %tmp24 = add i32 %tmp21, %tmp23
+  %tmp25 = load i32 * %r
+  %tmp26 = add i32 %tmp24, %tmp25
+  %tmp27 = load i32 * %a_tmp
+  %tmp28 = add i32 %tmp26, %tmp27
+  %tmp29 = load i32 * * %b
+  %tmp30 = getelementptr i32 * %tmp29, i32 0
+  %tmp31 = load i32 * %tmp30
+  %tmp32 = add i32 %tmp28, %tmp31
+  %tmp33 = load i32 * * %b
+  %tmp34 = getelementptr i32 * %tmp33, i32 1
+  %tmp35 = load i32 * %tmp34
+  %tmp36 = add i32 %tmp32, %tmp35
+  %tmp37 = load i32 * * %b
+  %tmp38 = getelementptr i32 * %tmp37, i32 2
+  %tmp39 = load i32 * %tmp38
+  %tmp40 = add i32 %tmp36, %tmp39
+  %tmp41 = load i32 * * %b
+  %tmp42 = getelementptr i32 * %tmp41, i32 3
+  %tmp43 = load i32 * %tmp42
+  %tmp44 = add i32 %tmp40, %tmp43
+  ret i32 %tmp44
 }
 declare i32 @printf (i8 *, ...)
 declare i8 * @malloc (i32)
