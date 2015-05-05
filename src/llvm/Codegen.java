@@ -403,13 +403,15 @@ public class Codegen extends VisitorAdapter {
 
 	public LlvmValue visit(While n) {
 		int line = n.line;
-		LlvmValue cmp = n.condition.accept(this);
+
 		LlvmLabelValue beginLabel = new LlvmLabelValue("whileBegin" + line);
 		LlvmLabelValue doLabel = new LlvmLabelValue("whileDo" + line);
 		LlvmLabelValue endLabel = new LlvmLabelValue("whileEnd" + line);
+		
 		assembler.add(new LlvmBranch(beginLabel));
-
 		assembler.add(new LlvmLabel(beginLabel));
+		
+		LlvmValue cmp = n.condition.accept(this);
 		assembler.add(new LlvmBranch(cmp, doLabel, endLabel));
 
 		assembler.add(new LlvmLabel(doLabel));
@@ -712,7 +714,7 @@ public class Codegen extends VisitorAdapter {
 		if(size instanceof LlvmIntegerLiteral) {
 			sizeInt = ((LlvmIntegerLiteral) size).value;
 		} else {
-			sizeInt = 100;
+			sizeInt = 10;
 		}
 		LlvmValue valueType = n.type.accept(this);
 		LlvmArray array = new LlvmArray(sizeInt, LlvmPrimitiveType.I32);
