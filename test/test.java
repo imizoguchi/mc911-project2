@@ -3,11 +3,11 @@ class m110
 {
     public static void main(String[] args)
     {
-    	System.out.println(new c().i(1));
+    	System.out.println(new testeArray().i(1));
     }
 }
 
-class c
+class testeArray
 {
 	int p;
 	int q;
