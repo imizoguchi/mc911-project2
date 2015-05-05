@@ -11,6 +11,7 @@ class testeArray
 {
 	int p;
 	int q;
+	
 	public int i(int a){
 		int q;
 		int r;

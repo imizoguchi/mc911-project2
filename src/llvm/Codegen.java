@@ -397,10 +397,20 @@ public class Codegen extends VisitorAdapter {
 		// Var is from superclass
 		if (!methodEnv.hasLocalVariable("%" + n.var.s)
 				&& !methodEnv.hasFormal("%" + n.var.s)) {
+			
+			if(val.type instanceof LlvmArray) {
+				LlvmArray arrayType = (LlvmArray) val.type;
+				LlvmValue oldValue = new LlvmNamedValue(val.toString(), new LlvmPointer(val.type));
+				val = new LlvmRegister(new LlvmPointer(LlvmPrimitiveType.I32));
+				assembler.add(new LlvmBitcast(val, oldValue, new LlvmPointer(LlvmPrimitiveType.I32)));
+//				element.type = new LlvmArray(arrayType.length,LlvmPrimitiveType.I32);
+			}
+			
 			R = new LlvmRegister(val.type);
 			assembler.add(new LlvmGetElementPointer(R, classEnv
 					.getClassReference(), classEnv.getOffsetTo("%" + n.var.s)));
 			R = new LlvmRegister(R.name, new LlvmPointer(R.type));
+			assembler.add(new LlvmStore(val, R));
 
 		} else {
 			// Var is from class
@@ -430,8 +440,8 @@ public class Codegen extends VisitorAdapter {
 			}
 			
 			R = new LlvmRegister(varName, new LlvmPointer(elementType));
+			assembler.add(new LlvmStore(val, R));
 		}
-		assembler.add(new LlvmStore(val, R));
 
 		return R;
 	}
