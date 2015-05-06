@@ -153,7 +153,7 @@ public class Codegen extends VisitorAdapter {
 
 				LlvmRegister R = new LlvmRegister(value.type);
 				assembler.add(new LlvmGetElementPointer(R, classEnv
-						.getClassReference(), classEnv.getOffsetTo("%"
+						.getClassReference(), symTab.getOffsetTo(classEnv,"%"
 						+ value.name)));
 				return new LlvmRegister(R.name, new LlvmPointer(R.type));
 			}
@@ -465,28 +465,36 @@ public class Codegen extends VisitorAdapter {
 
 				R = new LlvmRegister(val.type);
 				assembler.add(new LlvmGetElementPointer(R, classEnv
-						.getClassReference(), classEnv.getOffsetTo("%"
+						.getClassReference(), symTab.getOffsetTo(classEnv,"%"
 						+ n.var.s)));
 				R = new LlvmRegister(R.name, new LlvmPointer(R.type));
 				assembler.add(new LlvmStore(val, R));
 			} else {
-				element = symTab.classes.get(classEnv.superClassName).vars
-						.get(varName);
+				ClassNode classNode = classEnv;
+
+				LlvmRegister classObject = classEnv.getClassReference();
+
+				while (!classNode.hasVariable(varName)) {
+					
+					ClassNode superClass = symTab.classes.get(classNode.superClassName);
+
+					List<LlvmValue> offsets = new LinkedList<LlvmValue>();
+					offsets.add(new LlvmIntegerLiteral(1));
+					offsets.add(new LlvmIntegerLiteral(0));
+					LlvmRegister oldClassObject = classObject;
+					classObject = new LlvmRegister(superClass.getClassPointer());
+					assembler.add(new LlvmGetElementPointer(classObject,
+							oldClassObject, offsets));
+
+					classNode = superClass;
+				}
+
+				element = classNode.vars.get(varName);
 				elementType = element.type;
-
-				List<LlvmValue> offsets = new LinkedList<LlvmValue>();
-				offsets.add(new LlvmIntegerLiteral(0));
-				offsets.add(new LlvmIntegerLiteral(0));
-
-				LlvmRegister classObject = new LlvmRegister(symTab.classes.get(
-						classEnv.superClassName).getClassPointer());
-				assembler.add(new LlvmGetElementPointer(classObject, classEnv
-						.getClassReference(), offsets));
 
 				LlvmRegister obj = new LlvmRegister(elementType);
 				assembler.add(new LlvmGetElementPointer(obj, classObject,
-						symTab.classes.get(classEnv.superClassName)
-								.getOffsetTo("%" + n.var.s)));
+						symTab.getOffsetTo(classNode,"%" + n.var.s)));
 
 				R = new LlvmRegister(obj.name, new LlvmPointer(element.type));
 				assembler.add(new LlvmStore(val, R));
@@ -518,7 +526,7 @@ public class Codegen extends VisitorAdapter {
 			} else {
 				LlvmRegister R = new LlvmRegister(value.type);
 				assembler.add(new LlvmGetElementPointer(R, classEnv
-						.getClassReference(), classEnv.getOffsetTo("%"
+						.getClassReference(), symTab.getOffsetTo(classEnv,"%"
 						+ n.var.s)));
 				variableAddress = new LlvmRegister(R.name, new LlvmPointer(
 						R.type));
@@ -678,7 +686,7 @@ public class Codegen extends VisitorAdapter {
 				// Get address of the class variable
 				LlvmRegister classVar = new LlvmRegister(LlvmPrimitiveType.I32);
 				assembler.add(new LlvmGetElementPointer(classVar, classEnv
-						.getClassReference(), classEnv.getOffsetTo("%"
+						.getClassReference(), symTab.getOffsetTo(classEnv,"%"
 						+ n.name.s)));
 
 				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(
@@ -687,28 +695,31 @@ public class Codegen extends VisitorAdapter {
 
 				// Super class
 			} else {
-				// Get address of the class variable
-				LlvmRegister classObjectAddress = new LlvmRegister(
-						symTab.classes.get(classEnv.superClassName)
-								.getClassPointer());
+				String varName = "%"+n.name.s;
+				ClassNode classNode = classEnv;
 
-				List<LlvmValue> offsets = new LinkedList<LlvmValue>();
-				offsets.add(new LlvmIntegerLiteral(0));
-				offsets.add(new LlvmIntegerLiteral(0));
+				LlvmRegister classObject = classEnv.getClassReference();
 
-				assembler.add(new LlvmGetElementPointer(classObjectAddress,
-						classEnv.getClassReference(), offsets));
+				while (!classNode.hasVariable(varName)) {
+					
+					ClassNode superClass = symTab.classes.get(classNode.superClassName);
 
-				LlvmRegister objectAddress = new LlvmRegister(new LlvmPointer(
-						reg.type));
+					List<LlvmValue> offsets = new LinkedList<LlvmValue>();
+					offsets.add(new LlvmIntegerLiteral(1));
+					offsets.add(new LlvmIntegerLiteral(0));
+					LlvmRegister oldClassObject = classObject;
+					classObject = new LlvmRegister(superClass.getClassPointer());
+					assembler.add(new LlvmGetElementPointer(classObject,
+							oldClassObject, offsets));
 
-				assembler.add(new LlvmGetElementPointer(objectAddress,
-						classObjectAddress, symTab.classes.get(
-								classEnv.superClassName).getOffsetTo(
-								"%" + n.name.s)));
+					classNode = superClass;
+				}
 
-				assembler.add(new LlvmLoad(reg, new LlvmNamedValue(
-						objectAddress.name, new LlvmPointer(reg.type))));
+				LlvmRegister obj = new LlvmRegister(new LlvmPointer(classNode.vars.get(varName).type));
+				assembler.add(new LlvmGetElementPointer(obj, classObject,
+						symTab.getOffsetTo(classNode,varName)));
+
+				assembler.add(new LlvmLoad(reg, obj));
 				return reg;
 			}
 		}
@@ -899,6 +910,24 @@ class SymTab extends VisitorAdapter {
 		return new LlvmNamedValue(n.name, new LlvmPointer(new LlvmClassType(
 				n.name)));
 	}
+	
+	public List<LlvmValue> getOffsetTo(ClassNode c, String varName) {
+		List<LlvmValue> offsets = new LinkedList<LlvmValue>();
+		int count = 0;
+		if(c.superClassName != null) count = 1;
+		// Considering only i32 size elements
+		for (LlvmValue val : c.varList) {
+
+			if (val.toString().equals(varName))
+				break;
+
+			else count++;
+		}
+
+		offsets.add(new LlvmIntegerLiteral(0));
+		offsets.add(new LlvmIntegerLiteral(count));
+		return offsets;
+	}
 }
 
 class ClassNode extends LlvmType {
@@ -916,11 +945,13 @@ class ClassNode extends LlvmType {
 		this.structure = structure;
 		this.varList = varList;
 		this.vars = new HashMap<String, LlvmValue>();
-
+		
 		if (varList != null) {
 			for (LlvmValue val : varList) {
 				vars.put(val.toString(), val);
 			}
+		} else {
+			varList = new LinkedList<LlvmValue>();
 		}
 
 		this.methodList = new LinkedList<MethodNode>();
@@ -973,34 +1004,16 @@ class ClassNode extends LlvmType {
 		methods.put(methodNode.name, methodNode);
 	}
 
-	public List<LlvmValue> getOffsetTo(String varName) {
-		List<LlvmValue> offsets = new LinkedList<LlvmValue>();
-		int count = 0;
-		// Considering only i32 size elements
-		for (LlvmValue val : this.varList) {
-
-			if (val.toString().equals(varName))
-				break;
-
-			if (val.type instanceof ClassNode) {
-				count += ((ClassNode) val.type).getClassI32Size();
-			} else
-				count++;
-		}
-
-		offsets.add(new LlvmIntegerLiteral(0));
-		offsets.add(new LlvmIntegerLiteral(count));
-		return offsets;
-	}
-
 	public int getClassI32Size() {
 		int size = 0;
+		if(varList != null) {
 		for (LlvmValue val : this.varList) {
 
 			if (val.type instanceof ClassNode) {
 				((ClassNode) val.type).getClassI32Size();
-			} else {
-				size++;
+				} else {
+					size++;
+				}
 			}
 		}
 		return size;
